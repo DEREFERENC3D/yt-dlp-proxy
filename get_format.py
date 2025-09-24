@@ -8,7 +8,9 @@ def get_format(
 ) -> dict[str, str]:
     all_formats = info.get("requested_formats")
     if type(all_formats) is not list:
-        raise ValueError("requested_formats is garbage", all_formats)
+        all_formats = info.get("formats")
+    if type(all_formats) is not list:
+        raise ValueError("requested_formats and all_formats are both garbage", all_formats)
 
     if not len(all_formats):
         raise ValueError("No formats found")
