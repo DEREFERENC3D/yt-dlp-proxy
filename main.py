@@ -1,18 +1,40 @@
 from typing import Annotated
 
-from fastapi import FastAPI, Header, Query, Response, status
+from fastapi import FastAPI, Header, Path, Query, Response, status
 from fastapi.responses import RedirectResponse
+import requests
 from yt_dlp import YoutubeDL
 
 
-from custom_types import StreamType
+from custom_types import StreamRequestType, StreamType
 from get_format import get_format
 
 app = FastAPI()
 
 
-@app.get("/redirect")
-def redirect(
+def get_link(url: str, stream_type: StreamType | None):
+    with YoutubeDL() as ydl:
+        info = ydl.extract_info(
+            url,
+            download=False,
+        )
+
+    if type(info) is not dict:
+        raise ValueError("extract_info returned garbage")
+
+    fmt = get_format(info, stream_type)
+
+    return fmt["url"]
+
+
+@app.get("/{request_type}")
+def stream(
+    request_type: Annotated[
+        StreamRequestType,
+        Path(
+            title="Request type - redirect to the stream's original link or proxy it through this server"
+        ),
+    ],
     url: Annotated[
         str, Query(title="Link to the entity (e.g. YouTube video) to stream")
     ],
@@ -43,4 +65,16 @@ def redirect(
     except:
         return Response(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-    return RedirectResponse(fmt["url"])
+    match request_type:
+        case StreamRequestType.redirect:
+            return RedirectResponse(fmt["url"])
+        case StreamRequestType.proxy_initial:
+            res = requests.get(fmt["url"])
+            return Response(
+                res.content,
+                headers={
+                    "Content-Type": res.headers.get(
+                        "Content-Type", "application/octet-stream"
+                    )
+                },
+            )

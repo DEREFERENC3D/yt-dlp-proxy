@@ -6,6 +6,6 @@ class StreamType(str, Enum):
     audio = "audio"
 
 
-class RequestType(str, Enum):
+class StreamRequestType(str, Enum):
     redirect = "redirect"
-    stream = "stream"
+    proxy_initial = "proxy_initial"
