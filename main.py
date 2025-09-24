@@ -26,7 +26,7 @@ def redirect(
         user_agent is not None
         and user_agent.startswith("Music Player Daemon")
         and StreamType.audio
-        or StreamType.video
+        or None
     )
 
     with YoutubeDL() as ydl:
