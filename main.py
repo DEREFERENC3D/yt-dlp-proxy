@@ -1,4 +1,4 @@
-from typing import Annotated
+from typing import Annotated, Any
 from json import dumps
 
 from fastapi import FastAPI, Header, Path, Query, Response, status
@@ -36,6 +36,20 @@ def info(
 ):
     with YoutubeDL() as ydl:
         info = ydl.extract_info(url, download=False)
+
+    if type(info) is not dict:
+        return Response(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    return Response(dumps(info))
+
+@app.get("/search")
+def search(
+    q: Annotated[
+        str, Query(title="Terms to search for")
+    ],
+):
+    with YoutubeDL() as ydl:
+        info: Any | dict[str, str | list[Any]] | None = ydl.extract_info("ytsearch:" + q, download=False)
 
     if type(info) is not dict:
         return Response(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
