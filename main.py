@@ -1,4 +1,5 @@
 from typing import Annotated
+from json import dumps
 
 from fastapi import FastAPI, Header, Path, Query, Response, status
 from fastapi.responses import RedirectResponse
@@ -26,6 +27,20 @@ def get_link(url: str, stream_type: StreamType | None):
 
     return fmt["url"]
 
+
+@app.get("/info")
+def info(
+    url: Annotated[
+        str, Query(title="Link to the entity (e.g. YouTube video) to get info for")
+    ],
+):
+    with YoutubeDL() as ydl:
+        info = ydl.extract_info(url, download=False)
+
+    if type(info) is not dict:
+        return Response(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    return Response(dumps(info))
 
 @app.get("/{request_type}")
 def stream(
