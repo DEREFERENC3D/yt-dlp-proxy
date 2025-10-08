@@ -47,9 +47,12 @@ def search(
     q: Annotated[
         str, Query(title="Terms to search for")
     ],
+    result_count: Annotated[
+        int, Query(title="The amount of results to return")
+    ] = 10,
 ):
     with YoutubeDL() as ydl:
-        info: Any | dict[str, str | list[Any]] | None = ydl.extract_info("ytsearch:" + q, download=False)
+        info: Any | dict[str, str | list[Any]] | None = ydl.extract_info(f"ytsearch{result_count}:{q}", download=False)
 
     if type(info) is not dict:
         return Response(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
