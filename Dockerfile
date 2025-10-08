@@ -1,5 +1,7 @@
 FROM python:3.12-alpine
 
+RUN apk --no-cache add ffmpeg
+
 WORKDIR /app
 
 COPY requirements.txt ./
