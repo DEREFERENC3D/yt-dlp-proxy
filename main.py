@@ -45,7 +45,7 @@ def info(
 @app.get("/search")
 def search(
     q: Annotated[
-        str, Query(title="Terms to search for")
+        str, Query(title="Terms to search for", min_length=1)
     ],
     result_count: Annotated[
         int, Query(title="The amount of results to return")
