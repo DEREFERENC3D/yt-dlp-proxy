@@ -52,10 +52,12 @@ def search(
     ] = 10,
 ):
     with YoutubeDL() as ydl:
-        info: Any | dict[str, str | list[Any]] | None = ydl.extract_info(f"ytsearch{result_count}:{q}", download=False)
+        info: Any | dict[str, str | list[Any]] | None = ydl.extract_info(f"ytsearch{result_count}:{q}", download=False, process=False)
 
     if type(info) is not dict:
         return Response(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    info["entries"] = list(info["entries"])
 
     return Response(dumps(info))
 
