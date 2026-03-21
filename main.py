@@ -4,17 +4,18 @@ from json import dumps
 from fastapi import FastAPI, Header, Path, Query, Response, status
 from fastapi.responses import RedirectResponse
 import requests
-from yt_dlp import YoutubeDL
+from yt_dlp import YoutubeDL, parse_options
 
 
 from custom_types import StreamRequestType, StreamType
 from get_format import get_format
 
+yt_dlp_options = parse_options().ydl_opts
 app = FastAPI()
 
 
 def get_link(url: str, stream_type: StreamType | None):
-    with YoutubeDL() as ydl:
+    with YoutubeDL(yt_dlp_options) as ydl:
         info = ydl.extract_info(
             url,
             download=False,
@@ -34,7 +35,7 @@ def info(
         str, Query(title="Link to the entity (e.g. YouTube video) to get info for")
     ],
 ):
-    with YoutubeDL() as ydl:
+    with YoutubeDL(yt_dlp_options) as ydl:
         info = ydl.extract_info(url, download=False)
 
     if type(info) is not dict:
@@ -51,7 +52,7 @@ def search(
         int, Query(title="The amount of results to return")
     ] = 10,
 ):
-    with YoutubeDL() as ydl:
+    with YoutubeDL(yt_dlp_options) as ydl:
         info: Any | dict[str, str | list[Any]] | None = ydl.extract_info(f"ytsearch{result_count}:{q}", download=False, process=False)
 
     if type(info) is not dict:
@@ -85,7 +86,7 @@ def stream(
         or None
     )
 
-    with YoutubeDL() as ydl:
+    with YoutubeDL(yt_dlp_options) as ydl:
         info = ydl.extract_info(
             url,
             download=False,
