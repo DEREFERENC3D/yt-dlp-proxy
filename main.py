@@ -13,7 +13,7 @@ from yt_dlp import YoutubeDL, parse_options
 
 from custom_types import StreamRequestType, StreamType
 from get_format import get_format
-from config import FFMPEG_CHUNK_SIZE
+from config import FFMPEG_CHUNK_SIZE, TRANSCODE_PRESET, TRANSCODE_CRF
 
 yt_dlp_options = parse_options().ydl_opts
 app = FastAPI()
@@ -93,6 +93,9 @@ async def stream(
     stream_type: Annotated[
         StreamType | None, Query(title="Stream type - audio or video")
     ] = None,
+    transcode: Annotated[
+        str | None, Query(title="Output format to transcode into (video only)")
+    ] = None,
     user_agent: Annotated[str | None, Header()] = None,
 ):
     async with cancel_on_disconnect(r):
@@ -152,6 +155,11 @@ async def stream(
                 video_r, video_w = os.pipe()
                 audio_r, audio_w = os.pipe()
 
+                video_codec = (
+                    [transcode, "-preset", TRANSCODE_PRESET, "-crf", str(TRANSCODE_CRF)]
+                    if transcode
+                    else ["copy"]
+                )
                 ffprocess = subprocess.Popen(
                     [
                         "ffmpeg",
@@ -160,9 +168,8 @@ async def stream(
                         f"pipe:{video_r}",
                         "-i",
                         f"pipe:{audio_r}",
-                        # No transcoding, just remux the streams into one container
                         "-c:v",
-                        "copy",
+                        *video_codec,
                         "-c:a",
                         "copy",
                         # TODO / FIXME: this parameter is needed for MP4 containers
