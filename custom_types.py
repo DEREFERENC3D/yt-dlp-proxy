@@ -9,3 +9,4 @@ class StreamType(str, Enum):
 class StreamRequestType(str, Enum):
     redirect = "redirect"
     proxy_initial = "proxy_initial"
+    stream = "stream"

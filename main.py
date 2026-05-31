@@ -1,9 +1,12 @@
 from runner_with_api.fastapi.cancellation import cancel_on_disconnect
 from typing import Annotated, Any
 from json import dumps
+import os
+import subprocess
+from threading import Thread
 
 from fastapi import FastAPI, Header, Path, Query, Request, Response, status
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, StreamingResponse
 import requests
 from yt_dlp import YoutubeDL, parse_options
 
@@ -13,6 +16,9 @@ from get_format import get_format
 
 yt_dlp_options = parse_options().ydl_opts
 app = FastAPI()
+
+
+FFMPEG_CHUNK_SIZE = 8192
 
 
 def get_link(url: str, stream_type: StreamType | None):
@@ -62,6 +68,18 @@ def search(
     info["entries"] = list(info["entries"])
 
     return Response(dumps(info))
+
+
+def ffeeder(sem: dict[str, bool], fd: int, res: requests.Response):
+    try:
+        with os.fdopen(fd, "wb") as f:
+            for chunk in res.iter_content(chunk_size=FFMPEG_CHUNK_SIZE):
+                if sem["cancelled"]:
+                    break
+                _ = f.write(chunk)
+    except BrokenPipeError:
+        pass
+
 
 @app.get("/{request_type}")
 async def stream(
@@ -116,3 +134,105 @@ async def stream(
                         )
                     },
                 )
+            case StreamRequestType.stream:
+                upstream = requests.get(fmt["url"], stream=True)
+                if stream_type == StreamType.audio:
+                    # For audio there is no need to process the data
+                    return StreamingResponse(upstream)
+
+                # For video, we want to combine it with the audio track, so fetch that first
+                try:
+                    audio_fmt = get_format(info, StreamType.audio)
+                except:
+                    return Response(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+                upstream_audio = requests.get(audio_fmt["url"], stream=True)
+
+                # Use ffmpeg to merge the streams. We create pipes manually instead of just using STDIN,
+                # as we need two inputs, not one - and if we want more tracks in the future,
+                # we will need even more pipes
+
+                video_r, video_w = os.pipe()
+                audio_r, audio_w = os.pipe()
+
+                ffprocess = subprocess.Popen(
+                    [
+                        "ffmpeg",
+                        "-i",
+                        f"pipe:{video_r}",
+                        "-i",
+                        f"pipe:{audio_r}",
+                        # No transcoding, just remux the streams into one container
+                        "-c:v",
+                        "copy",
+                        "-c:a",
+                        "copy",
+                        # TODO / FIXME: this parameter is needed for MP4 containers
+                        # (fixes "muxer does not support non seekable output" error)
+                        # but will likely not work for any other format
+                        "-movflags",
+                        "frag_keyframe+empty_moov",
+                        # since the output is a pipe, ffmpeg can't do
+                        # the usual extension guessing from the file name
+                        # and needs it specified
+                        "-f",
+                        fmt["ext"],
+                        # TODO: Add duration parameter ("-t")? Might fix clients not showing total length
+                        "pipe:",
+                    ],
+                    # Don't forget to pass the pipes (lol) used in the args above
+                    pass_fds=(video_r, audio_r),
+                    stdout=subprocess.PIPE,
+                )
+
+                # Set up the input - create threads for writing the data into the pipes.
+
+                # Since there is no (built-in / easy / lazy) way to kill a thread in Python,
+                # we use a semaphore and check it in the thread's code, returning when signalled.
+                sem = {"cancelled": False}
+
+                t_video = Thread(target=ffeeder, args=(sem, video_w, upstream))
+                t_video.daemon = True
+
+                t_audio = Thread(target=ffeeder, args=(sem, audio_w, upstream_audio))
+                t_audio.daemon = True
+
+                # Set up the output - wraped in a generator to make it compatible with "StreamingResponse"
+                async def stream_generator():
+                    while True:
+                        if await r.is_disconnected():
+                            # Disconnection handling, since this is a long-running request
+                            # We do not want to keep processing if the client disconnects
+
+                            # Signal the threads to stop feeding data into ffmpeg
+                            sem["cancelled"] = True
+
+                            # Close its output to force it to exit
+                            if ffprocess.stdout:
+                                ffprocess.stdout.close()
+
+                            # Reap the process. We don't want zombies, do we?
+                            _ = ffprocess.wait()
+
+                            # ...And we're done.
+                            break
+
+                        if ffprocess.poll() is not None:
+                            # Process died. This is unexpected (unless end of stream?), but handle it gracefully.
+                            # TODO: Figure out if this happens on end of stream
+                            # TODO: Check if threads actually need to be stopped - both here and in the end of stream case (if it is separate after all)
+
+                            # Stop the input threads if they have not already
+                            sem["cancelled"] = True
+                            break
+
+                        chunk = ffprocess.stdout.read(FFMPEG_CHUNK_SIZE)  # pyright: ignore[reportOptionalMemberAccess]
+                        if chunk:
+                            yield chunk
+                        else:
+                            break
+
+                t_video.start()
+                t_audio.start()
+
+                return StreamingResponse(stream_generator())
