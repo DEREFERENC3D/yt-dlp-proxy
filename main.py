@@ -13,12 +13,10 @@ from yt_dlp import YoutubeDL, parse_options
 
 from custom_types import StreamRequestType, StreamType
 from get_format import get_format
+from config import FFMPEG_CHUNK_SIZE
 
 yt_dlp_options = parse_options().ydl_opts
 app = FastAPI()
-
-
-FFMPEG_CHUNK_SIZE = 8192
 
 
 def get_link(url: str, stream_type: StreamType | None):
