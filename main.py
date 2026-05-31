@@ -50,17 +50,16 @@ def info(
 
     return Response(dumps(info))
 
+
 @app.get("/search")
 def search(
-    q: Annotated[
-        str, Query(title="Terms to search for", min_length=1)
-    ],
-    result_count: Annotated[
-        int, Query(title="The amount of results to return")
-    ] = 10,
+    q: Annotated[str, Query(title="Terms to search for", min_length=1)],
+    result_count: Annotated[int, Query(title="The amount of results to return")] = 10,
 ):
     with YoutubeDL(yt_dlp_options) as ydl:
-        info: Any | dict[str, str | list[Any]] | None = ydl.extract_info(f"ytsearch{result_count}:{q}", download=False, process=False)
+        info: Any | dict[str, str | list[Any]] | None = ydl.extract_info(
+            f"ytsearch{result_count}:{q}", download=False, process=False
+        )
 
     if type(info) is not dict:
         return Response(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -177,7 +176,6 @@ async def stream(
                         # and needs it specified
                         "-f",
                         fmt["ext"],
-                        # TODO: Add duration parameter ("-t")? Might fix clients not showing total length
                         "pipe:",
                     ],
                     # Don't forget to pass the pipes (lol) used in the args above
