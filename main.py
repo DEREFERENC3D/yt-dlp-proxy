@@ -157,6 +157,7 @@ async def stream(
                 ffprocess = subprocess.Popen(
                     [
                         "ffmpeg",
+                        "-hide_banner",
                         "-i",
                         f"pipe:{video_r}",
                         "-i",
