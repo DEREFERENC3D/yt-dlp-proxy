@@ -19,21 +19,6 @@ yt_dlp_options = parse_options().ydl_opts
 app = FastAPI()
 
 
-def get_link(url: str, stream_type: StreamType | None):
-    with YoutubeDL(yt_dlp_options) as ydl:
-        info = ydl.extract_info(
-            url,
-            download=False,
-        )
-
-    if type(info) is not dict:
-        raise ValueError("extract_info returned garbage")
-
-    fmt = get_format(info, stream_type)
-
-    return fmt["url"]
-
-
 @app.get("/info")
 def info(
     url: Annotated[
