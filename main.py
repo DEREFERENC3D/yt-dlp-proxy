@@ -107,7 +107,7 @@ async def stream(
 
         match request_type:
             case StreamRequestType.redirect:
-                return RedirectResponse(fmt["url"])
+                return RedirectResponse(fmt["url"], status_code=status.HTTP_302_FOUND)
             case StreamRequestType.proxy_initial:
                 res = requests.get(fmt["url"])
                 return Response(
