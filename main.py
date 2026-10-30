@@ -1,5 +1,6 @@
 import os
 import subprocess
+from asyncio import sleep
 from json import dumps
 from threading import Thread
 from typing import Annotated, Any
@@ -10,7 +11,12 @@ from fastapi.responses import RedirectResponse, StreamingResponse
 from runner_with_api.fastapi.cancellation import cancel_on_disconnect
 from yt_dlp import YoutubeDL, parse_options
 
-from config import FFMPEG_CHUNK_SIZE, TRANSCODE_CRF, TRANSCODE_PRESET
+from config import (
+    BULLSHIT_DELAY_SECONDS,
+    FFMPEG_CHUNK_SIZE,
+    TRANSCODE_CRF,
+    TRANSCODE_PRESET,
+)
 from custom_types import StreamRequestType, StreamType
 from get_format import get_format
 
@@ -104,6 +110,9 @@ async def stream(
             fmt = get_format(info, stream_type)
         except:
             return Response(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        print(f"Watiting for YouTube's bullshit ({BULLSHIT_DELAY_SECONDS}s)")
+        _ = await sleep(BULLSHIT_DELAY_SECONDS)
 
         match request_type:
             case StreamRequestType.redirect:
