@@ -117,6 +117,7 @@ async def stream(
                             "Content-Type", "application/octet-stream"
                         )
                     },
+                    status_code=res.status_code,
                 )
             case StreamRequestType.stream:
                 upstream = requests.get(fmt["url"], stream=True)
