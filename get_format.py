@@ -1,5 +1,7 @@
 from typing import Any
 
+from yt_dlp import YoutubeDL
+
 from custom_types import StreamType
 
 
@@ -19,21 +21,10 @@ def get_format(
     if stream_type is None:
         return all_formats[0]
 
-    match stream_type:
-        case StreamType.audio:
-            filtered = list(
-                filter(
-                    lambda x: x.get("resolution") == "audio only",
-                    all_formats,
-                )
-            )
-        case StreamType.video:
-            filtered = list(
-                filter(
-                    lambda x: x.get("resolution") != "audio only",
-                    all_formats,
-                )
-            )
+    format_type = "bestaudio" if stream_type == StreamType.audio else "best"
+    with YoutubeDL() as ydl:
+        selector = ydl.build_format_selector(format_type)
+    filtered = list(selector(info))
 
     if len(filtered) < 0:
         raise ValueError("No formats of the requested type found")
